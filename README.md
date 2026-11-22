@@ -31,9 +31,12 @@ export ORCA_BRIDGE_STATE_FILE="$HOME/.orca-dingtalk-bridge/state.json"
 export ORCA_BRIDGE_TIMEOUT=120               # seconds
 
 dws dev connect --channel custom \
+  --allowed-users "$DINGTALK_OWNER_USER_ID" \
   --agent-cmd "python3 /absolute/path/to/bridge.py" \
   --unified-app-id '<dws unified app id>'
 ```
+
+The `--allowed-users` flag is an additional dws-side gate and should be set whenever the dws version supports it. The bridge repeats the check when sender metadata is available to the command.
 
 Use `--robot-client-id` and `--robot-client-secret` when that is how your `dws` installation is configured. The state file maps each DingTalk conversation to an Orca bot chat and is created atomically. It is ignored by Git. `DWS_SESSION_ID` is used as a fallback conversation key when a custom adapter does not provide an open conversation ID. For synthetic integrations, pass a JSON event on stdin with `text`, `senderStaffId`, `openConversationId`, and optional group/mention fields.
 
