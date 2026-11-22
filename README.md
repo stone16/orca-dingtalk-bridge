@@ -2,7 +2,7 @@
 
 Message your Orca bots from DingTalk. Each bridge instance connects one authorized
 owner's 1:1 DingTalk chat to one local Orca bot and relays the bot's replies.
-We use it to talk to our Orca bot from DingTalk on a phone while away from
+We built it to talk to our Orca bot from DingTalk on a phone while away from
 the Mac running the bridge. The bridge needs no Orca changes or public endpoint.
 
 ## Prerequisites
@@ -80,8 +80,9 @@ group.
 
 The bridge instructs the bot to treat quoted content as untrusted and permits
 actions available to it in Orca under Orca's existing authorization controls.
-If a reply would disclose private investment, email, or health information,
-the prompt tells the bot to keep the answer in Orca and say so in DingTalk.
+If a reply would disclose credentials, tokens, secrets, or private information
+about investments, email, or health, the prompt tells the bot to keep the answer
+in Orca and say so in DingTalk.
 The bridge relies on the bot to follow this instruction.
 
 ## Mail, state and errors
