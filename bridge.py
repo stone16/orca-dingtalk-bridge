@@ -39,7 +39,8 @@ def config(env):
     if not re.fullmatch(r"term_[a-zA-Z0-9_-]+", terminal):
         raise BridgeError("Start the bridge in a dedicated Orca terminal.")
     try:
-        timeout = int(env.get("ORCA_BRIDGE_TIMEOUT", "120"))
+        # Local Orca bot answers took a median of 68 s, and 28% took over 120 s.
+        timeout = int(env.get("ORCA_BRIDGE_TIMEOUT", "300"))
         if timeout <= 0:
             raise ValueError
     except ValueError:
@@ -193,15 +194,17 @@ class Bridge:
                 self.save(entry)
             if not pending.get("id"):
                 raise BridgeError(
-                    "The previous send is unconfirmed. Its pending record expires after 24 hours. "
-                    "Check the Orca bot chat before repeating the request."
+                    "The previous send is unconfirmed, so this message was not forwarded. Its pending record "
+                    "expires after 24 hours. Check the Orca bot chat before repeating the request."
                 )
             try:
                 answer, chat = self.answer(pending, chat, deadline)
             except (TimeoutError, subprocess.TimeoutExpired):
                 raise BridgeError(
-                    "The Orca request is still pending. A later message can collect the earlier reply. "
-                    "The pending record expires after 24 hours. The bridge will not resend the request."
+                    ("The earlier Orca request is still running, so this message was not forwarded. "
+                     if recovering else "Orca has not answered yet. ")
+                    + "Send any message later to collect the reply; that message will not be forwarded. "
+                    "The request will not be resent and expires after 24 hours."
                 ) from None
             self.save({"chat": chat})
             reply = format_reply(answer)

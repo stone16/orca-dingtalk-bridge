@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -61,6 +62,7 @@ class ConfigTests(unittest.TestCase):
             self.assertNotIn("--allowed-users", command)
             self.assertNotIn("--daemon", command)
             self.assertTrue(command[-1].endswith("bridge.py handle"))
+            self.assertEqual(command[command.index("--agent-timeout") + 1], "315")
 
     def test_launcher_rejects_agent_pane(self):
         with patch.dict(os.environ, dict(ENV), clear=True), patch(
@@ -139,16 +141,37 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual([call.args[1] for call in read.call_args_list], [20, 40, 80, 160])
         self.assertTrue(all(call.args[0] == "term_previous" for call in read.call_args_list))
 
-    def test_timeout_recovers_original_without_sending_again(self):
-        with patch.object(self.bridge, "inbox", return_value=[]), patch.object(
-            self.bridge, "answer", side_effect=[TimeoutError, ("**late**", "old-chat")]
-        ), patch("bridge.orca", return_value={"messageId": "q1"}) as cli:
-            with self.assertRaisesRegex(BridgeError, "still pending.*expires after 24 hours"):
-                self.bridge.ask("perform action")
+    def test_late_reply_is_recovered_by_next_message(self):
+        # Mirrors the live incident: the bot answered at sequence 2027, after the wait budget.
+        rows, sends = [mail("old", 2005)], []
+
+        def fake_orca(args, deadline, body=None):
+            if deadline <= time.monotonic():
+                raise TimeoutError
+            if args[1] == "send":
+                sends.append(args)
+                return {"messageId": f"q{len(sends)}"}
+            return {"messages": sorted(rows, key=lambda row: -row["sequence"])[:int(args[args.index("--limit") + 1])]}
+
+        self.path.write_text(json.dumps({"chat": "abc"}))
+        self.bridge.timeout = 0.05
+        with patch("bridge.orca", side_effect=fake_orca):
+            with self.assertRaisesRegex(BridgeError, "not answered yet.*any message later") as first:
+                self.bridge.ask("slow question")
+            with self.assertRaisesRegex(BridgeError, "still running, so this message was not forwarded") as second:
+                self.bridge.ask("are you there?")
             self.assertEqual(json.loads(self.path.read_text())["pending"]["id"], "q1")
-            self.assertIn("Earlier Orca reply", self.bridge.ask("try again"))
-        cli.assert_called_once()
-        self.assertEqual(json.loads(self.path.read_text()), {"chat": "old-chat"})
+            rows.append(mail("q1", 2027))
+            self.assertEqual(self.bridge.ask("ping"),
+                             "**Earlier Orca reply** (this message was not forwarded)\n\n**Answer**")
+            self.assertEqual(json.loads(self.path.read_text()), {"chat": "abc"})
+            self.assertEqual(len(sends), 1)
+            with self.assertRaises(BridgeError):
+                self.bridge.ask("next question")
+        self.assertEqual(len(sends), 2)
+        self.assertIn("abc", sends[1])
+        for error in (first.exception, second.exception):
+            self.assertLessEqual(len(f"Bridge error: {error}"), 300)  # dws relays at most 300 stderr chars
 
     def test_send_timeout_is_ambiguous_and_blocks_resend(self):
         with patch.object(self.bridge, "inbox", return_value=[]), patch(

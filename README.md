@@ -94,11 +94,21 @@ use that same chat. It never marks Orca mail read.
 
 The state directory defaults to `~/.orca-dingtalk-bridge`. Set
 `ORCA_BRIDGE_STATE_DIR` to choose another private directory. State files are
-locked and written atomically. The wait budget defaults to 120 seconds
-(`ORCA_BRIDGE_TIMEOUT`, in seconds). Timeouts preserve the pending request.
-When another DingTalk message arrives, the bridge checks for the earlier
-reply and labels it as such. That incoming message is not forwarded. Once
-the previous reply has been recovered, a subsequent new message starts
+locked and written atomically.
+
+The bridge waits up to 300 seconds for each answer (`ORCA_BRIDGE_TIMEOUT`, in
+seconds). Bot turns that use tools can take minutes. In a sample of 61 local
+Orca bot answers, the median was 68 seconds and 17 took over 120 seconds.
+Set `ORCA_BRIDGE_TIMEOUT` before `python3 bridge.py start`. The launcher
+passes that budget plus 15 seconds to dws as its per-call limit, so restart
+the bridge to change it. A restart keeps the pending request, and Orca
+1.4.268 still serves the earlier terminal's mailbox after that tab closes.
+
+A timeout preserves the pending request and returns an error to DingTalk.
+Send any message later to collect the reply. The bridge returns the earlier
+reply, labelled as such, and does not forward the message that collected it.
+If the bot is still working, the error says that message was not forwarded.
+Once the previous reply has been recovered, a subsequent new message starts
 another turn.
 
 If Orca definitively refuses a send before delivery, the bridge clears it.
