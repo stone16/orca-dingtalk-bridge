@@ -1,8 +1,11 @@
+import ast
 import contextlib
 import io
 import json
 import os
+import re
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -11,6 +14,20 @@ from unittest.mock import patch
 
 from bridge import Bridge, BridgeError, OrcaRejected, config, format_reply, main, orca, start
 
+
+BRIDGE = Path(__file__).with_name("bridge.py")
+# Answers `orchestration send` with q1, then serves the reply once a send was recorded.
+FAKE_ORCA = """#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+args, sent = sys.argv[1:], Path(__file__).with_name("sent.json")
+if args[:2] == ["orchestration", "send"]:
+    sent.write_text(json.dumps({"args": args, "body": sys.stdin.read()}))
+    result = {"messageId": "q1"}
+else:
+    result = {"messages": json.loads(%r) if sent.exists() else []}
+print(json.dumps({"ok": True, "result": result}))
+"""
 
 ENV = {
     "DINGTALK_OWNER_USER_ID": "owner",
@@ -61,6 +78,8 @@ class ConfigTests(unittest.TestCase):
             command = run.call_args.args[1]
             self.assertNotIn("--allowed-users", command)
             self.assertNotIn("--daemon", command)
+            self.assertIn("--reply-card=false", command)
+            self.assertEqual(command[command.index("--agent-timeout") + 1], "135")
             self.assertTrue(command[-1].endswith("bridge.py handle"))
             self.assertEqual(command[command.index("--agent-timeout") + 1], "315")
 
@@ -236,3 +255,36 @@ class BridgeTests(unittest.TestCase):
     def test_reply_format(self):
         self.assertEqual(format_reply("  # title  "), "# title")
         self.assertIn("empty", format_reply(" "))
+
+
+class CommandTests(unittest.TestCase):
+    def test_documented_probe_runs_through_real_processes(self):
+        probe = "--probe: reply with BRIDGE_OK using the question reply command."
+        with tempfile.TemporaryDirectory() as directory:
+            fake = Path(directory) / "orca"
+            fake.write_text(FAKE_ORCA % json.dumps([mail("q1", 1)]), encoding="utf-8")
+            fake.chmod(0o700)
+            env = dict(ENV, PATH=f"{directory}{os.pathsep}{os.environ['PATH']}",
+                       ORCA_BRIDGE_STATE_DIR=directory, ORCA_BRIDGE_BOT="Probe", ORCA_BRIDGE_TIMEOUT="5")
+            result = subprocess.run([sys.executable, "-I", str(BRIDGE), "handle", probe], env=env,
+                                    stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+            self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "**Answer**\n", ""))
+            sent = json.loads((Path(directory) / "sent.json").read_text(encoding="utf-8"))
+            self.assertEqual(sent["args"][2:8], ["--to", "bot:Probe", "--from", "term_test", "--chat", "new"])
+            self.assertTrue(sent["body"].endswith("\n\n" + probe))
+            state = Path(directory) / f"bridge-state-{ENV['ORCA_BRIDGE_SCOPE']}.json"
+            self.assertEqual(json.loads(state.read_text(encoding="utf-8")), {"chat": "abc"})
+
+
+class ReadmeTests(unittest.TestCase):
+    def test_chinese_readme_lists_every_error_and_setting(self):
+        source = BRIDGE.read_text(encoding="utf-8")
+        readme = BRIDGE.with_name("README.zh-CN.md").read_text(encoding="utf-8")
+        errors = [node.args[0].value for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)
+                  and getattr(node.func, "id", None) in {"BridgeError", "OrcaRejected"}]
+        errors += re.findall(r'"Bridge error: ([^"{]+)"', source)
+        settings = re.findall(r'"((?:DINGTALK|DWS|ORCA)_[A-Z_]+)"', source)
+        self.assertGreater(len(errors), 10)
+        for text in errors + settings:
+            with self.subTest(text=text):
+                self.assertTrue(text in readme, f"README.zh-CN.md does not mention: {text}")

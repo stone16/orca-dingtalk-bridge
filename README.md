@@ -1,5 +1,7 @@
 # DingTalk ↔ Orca local bridge
 
+English · [简体中文](README.zh-CN.md)
+
 Message your Orca bots from DingTalk. Each bridge instance connects one authorized
 owner's 1:1 DingTalk chat to one local Orca bot and relays the bot's replies.
 We use it to talk to our Orca bot from DingTalk on a phone while away from
