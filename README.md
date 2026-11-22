@@ -1,7 +1,7 @@
 # DingTalk ↔ Orca local bridge
 
-Relay DingTalk robot messages to a local Orca bot and return its answer as
-Markdown in the originating DingTalk chat. The bridge runs on your machine as
+Relay DingTalk robot messages from one authorized direct chat to a local
+Orca bot and return its answer to that chat. The bridge runs on your machine as
 an independent integration and needs no Orca changes or public endpoint.
 
 ## Prerequisites
@@ -49,7 +49,7 @@ python3 bridge.py start 'your-unified-app-id'
 ```
 
 Send the robot a harmless question in a DingTalk direct chat. The bridge
-passes the question to your bot and returns its Markdown reply. Press Ctrl-C
+passes the question to your bot and returns its reply. Press Ctrl-C
 in the dedicated terminal to stop the bridge. Use the launcher as shown so
 the same allowlists reach dws and the bridge.
 
@@ -59,26 +59,27 @@ dws enforces the sender allowlist against the callback's `senderStaffId`
 before invoking the bridge. The launcher refuses empty or out-of-policy
 `DWS_ALLOWED_USERS`, then passes the validated list to dws as environment
 configuration. The bridge checks that configuration again at each invocation.
-By default the bridge allowlist contains only `DINGTALK_OWNER_USER_ID`. To
-authorize more staff IDs, set `DINGTALK_ALLOWED_USERS` to a comma-separated
-list and set `DWS_ALLOWED_USERS` to the members of that list who should have
-access.
+The only permitted staff ID is `DINGTALK_OWNER_USER_ID`. If upgrading from
+a previous version, unset `DINGTALK_ALLOWED_USERS` and `ORCA_BRIDGE_GROUPS`
+and leave `DWS_ALLOWED_GROUPS` unset or set to `none` before starting.
 
 dws splits the configured agent command on whitespace, appends the message
 as a single final argument, and gives the child closed stdin. Its custom
 channel supplies neither the sender ID nor the conversation ID to the child.
-The bridge therefore relies on dws for sender verification and shares one
-Orca chat per configured app, bot, and set of allowed users and groups.
-Separate DingTalk conversation history requires a transport that supplies
-authenticated conversation metadata.
+The bridge therefore relies on dws for sender verification and uses one
+Orca chat per configured app, bot, and permitted staff ID.
 
-The default group allowlist is the sentinel `none`, which makes the robot
-DM-only. To allow group @-mentions, set `ORCA_BRIDGE_GROUPS` to a
-comma-separated list of DingTalk group `openConversationId` values and restart.
-Every member of an enabled group can see replies there, and context from
-other enabled entry points can influence those replies. Use a dedicated bot
-with permissions appropriate to that audience. An allowed sender can reach
-the bot with the bot's configured capabilities.
+The launcher always sets dws's group allowlist to the sentinel `none`, which
+makes the robot DM-only. dws custom commands supply no authenticated
+conversation ID, so enabling multiple users or groups would allow a late
+answer to be delivered to the next caller. This is a hard limitation of the
+custom channel. A transport that supplies authenticated conversation metadata
+is required before this bridge can safely support more than one user or any
+group.
+
+The bridge prefixes each request with a short instruction to treat quoted
+content as untrusted and to defer private information or external actions to
+the owner's Orca conversation. Orca's own authorization controls still apply.
 
 ## Mail, state and errors
 
@@ -96,13 +97,16 @@ reply and labels it as such. That incoming message is not forwarded. Once
 the previous reply has been recovered, a subsequent new message starts
 another turn.
 
-If the previous send is unconfirmed, the bot chat was closed, or the saved
-mailbox is no longer accessible, stop the connector and inspect the Orca bot
-chat before resetting state. Once you have accounted for the earlier request,
-move the old state directory aside or select a fresh private state directory
-and restart. The next turn creates a new Orca chat.
+If Orca definitively refuses a send before delivery, the bridge clears it.
+If the saved chat was rejected as missing, a later message opens a fresh
+chat. Otherwise an unconfirmed send or unanswered question stays pending for
+24 hours. The next message after expiry clears it and returns an expiry
+notice. The bridge sends no question on that turn. Check the Orca bot chat
+before repeating the earlier request, which may still be running there.
 
-On success dws relays stdout through the session webhook. On non-zero exit,
+On success dws relays stdout through the session webhook. dws v1.0.68 renders
+replies of more than 200 Unicode code points as Markdown and shorter replies
+as plain text. On non-zero exit,
 dws v1.0.68 sends up to 300 characters of stderr to that conversation. The
 bridge returns short error messages through stderr and keeps raw CLI output
 and local exceptions out of the reply.

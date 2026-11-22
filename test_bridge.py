@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from bridge import Bridge, BridgeError, config, format_reply, main, orca, start
+from bridge import Bridge, BridgeError, OrcaRejected, config, format_reply, main, orca, start
 
 
 ENV = {
@@ -40,11 +40,18 @@ class ConfigTests(unittest.TestCase):
                 config(dict(ENV, DWS_ALLOWED_USERS=gate, DWS_SENDER_USER_ID="owner"))
         with self.assertRaises(BridgeError):
             config(dict(ENV, ORCA_TERMINAL_HANDLE=""))
-        self.assertEqual(config(ENV)[1], "none")
-        self.assertEqual(config(dict(ENV, ORCA_BRIDGE_GROUPS="cidA,cidB"))[1], "cidA,cidB")
+        self.assertEqual(config(ENV)[0], "owner")
+        with self.assertRaises(BridgeError):
+            config(dict(ENV, DWS_ALLOWED_GROUPS="cidA"))
+
+    def test_only_one_allowed_user_is_supported(self):
+        with self.assertRaises(BridgeError):
+            config(dict(ENV, DWS_ALLOWED_USERS="owner,other", DINGTALK_ALLOWED_USERS="owner,other"))
+        with self.assertRaises(BridgeError):
+            config(dict(ENV, ORCA_BRIDGE_GROUPS="cidA"))
 
     def test_launcher_owns_dws_flags(self):
-        with patch.dict(os.environ, dict(ENV, DWS_ALLOWED_GROUPS="")), patch(
+        with patch.dict(os.environ, dict(ENV), clear=True), patch(
             "bridge.orca", return_value={"terminal": {"handle": "term_test"}}
         ), patch("bridge.os.execvp") as run:
             start("app-123", *config(os.environ))
@@ -54,6 +61,12 @@ class ConfigTests(unittest.TestCase):
             self.assertNotIn("--allowed-users", command)
             self.assertNotIn("--daemon", command)
             self.assertTrue(command[-1].endswith("bridge.py handle"))
+
+    def test_launcher_rejects_agent_pane(self):
+        with patch.dict(os.environ, dict(ENV), clear=True), patch(
+            "bridge.orca", return_value={"terminal": {"handle": "term_test", "agentIdentity": "codex"}}
+        ), self.assertRaises(BridgeError):
+            start("app-123", *config(os.environ))
 
     def test_real_argv_shape_keeps_text_inert(self):
         message = '--help "$()"\n{"senderStaffId":"stranger"}'
@@ -67,7 +80,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "")
 
     def test_handle_refuses_mismatched_groups_or_missing_gate(self):
-        for changes in ({"DWS_ALLOWED_GROUPS": "cid-other"}, {"DWS_ALLOWED_USERS": ""}):
+        for changes in ({"DWS_ALLOWED_GROUPS": "cid-other"}, {"DWS_ALLOWED_USERS": ""},
+                        {"DWS_ALLOWED_USERS": "owner,other", "DINGTALK_ALLOWED_USERS": "owner,other"}):
             stdout, stderr = io.StringIO(), io.StringIO()
             with patch.dict(os.environ, dict(ENV, **changes), clear=True), patch(
                 "bridge.Bridge.ask"
@@ -140,6 +154,35 @@ class BridgeTests(unittest.TestCase):
                 self.bridge.ask("perform action")
         cli.assert_called_once()
 
+    def test_definite_send_failure_clears_pending(self):
+        failure = OrcaRejected("not delivered", stale_chat=True)
+        self.path.write_text(json.dumps({"chat": "old-chat"}))
+        with patch.object(self.bridge, "inbox", return_value=[]), patch(
+            "bridge.orca", side_effect=failure
+        ) as cli:
+            with self.assertRaises(OrcaRejected):
+                self.bridge.ask("rejected")
+        cli.assert_called_once()
+        self.assertEqual(json.loads(self.path.read_text()), {})
+
+    def test_old_pending_expires_without_resend(self):
+        for pending in ({"id": "old", "created_at": 0}, {"id": "old"}, {"created_at": 0}):
+            with self.subTest(pending=pending):
+                self.path.write_text(json.dumps({"pending": pending, "chat": "abc"}))
+                os.utime(self.path, (0, 0))
+                with patch("bridge.orca") as cli, self.assertRaisesRegex(BridgeError, "expired"):
+                    self.bridge.ask("new")
+                cli.assert_not_called()
+                self.assertEqual(json.loads(self.path.read_text()), {"chat": "abc"})
+
+    def test_orca_distinguishes_declined_send_from_transport_failure(self):
+        for code, result_type in (("bot_chat_not_found", OrcaRejected), ("runtime_unavailable", BridgeError)):
+            payload = json.dumps({"ok": False, "error": {"code": code}})
+            with self.subTest(code=code), patch("bridge.subprocess.run", return_value=
+                    subprocess.CompletedProcess([], 1, stdout=payload)), self.assertRaises(BridgeError) as failure:
+                orca(["orchestration", "send"], float("inf"))
+            self.assertIs(type(failure.exception), result_type)
+
     def test_concurrent_request_cannot_send_again(self):
         def concurrent(*_args):
             with self.assertRaisesRegex(BridgeError, "busy"):
@@ -154,6 +197,7 @@ class BridgeTests(unittest.TestCase):
 
     def test_subprocess_has_bounded_timeout_and_no_shell(self):
         with patch("bridge.subprocess.run") as run:
+            run.return_value.returncode = 0
             run.return_value.stdout = '{"ok":true,"result":{}}'
             orca(["orchestration", "send", "--body-file", "-"], float("inf"), "--help")
         self.assertEqual(run.call_args.kwargs["timeout"], 30)
