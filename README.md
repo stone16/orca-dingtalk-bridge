@@ -2,7 +2,7 @@
 
 Message your Orca bots from DingTalk. Each bridge instance connects one authorized
 owner's 1:1 DingTalk chat to one local Orca bot and relays the bot's replies.
-We built it to talk to our Orca bot from DingTalk on a phone while away from
+We use it to talk to our Orca bot from DingTalk on a phone while away from
 the Mac running the bridge. The bridge needs no Orca changes or public endpoint.
 
 ## Prerequisites
@@ -134,4 +134,4 @@ python3 -I bridge.py handle '--probe: reply with BRIDGE_OK using the question re
 ```
 
 This sends a real question to the configured Orca bot from that shell.
-A live DingTalk round trip is still pending a configured app.
+The DingTalk-to-Orca round trip was also verified in a live 1:1 chat.
