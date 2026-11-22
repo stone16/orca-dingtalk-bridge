@@ -4,4 +4,7 @@ __pycache__/
 .env
 .env.*
 state.json
+bridge-state-*.json
+bridge-state-*.lock
+.state-*
 .orca-dingtalk-bridge/
