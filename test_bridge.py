@@ -173,7 +173,17 @@ class BridgeTests(unittest.TestCase):
 
         self.path.write_text(json.dumps({"chat": "abc"}))
         self.bridge.timeout = 0.05
-        with patch("bridge.orca", side_effect=fake_orca):
+        clock = [1000.0]
+
+        def clock_now():
+            return clock[0]
+
+        def advance(seconds):
+            clock[0] += seconds
+
+        with patch("bridge.orca", side_effect=fake_orca), patch(
+                "bridge.time.monotonic", side_effect=clock_now), patch(
+                "bridge.time.sleep", side_effect=advance):
             with self.assertRaisesRegex(BridgeError, "not answered yet.*any message later") as first:
                 self.bridge.ask("slow question")
             with self.assertRaisesRegex(BridgeError, "still running, so this message was not forwarded") as second:

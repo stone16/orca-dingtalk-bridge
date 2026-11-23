@@ -127,7 +127,9 @@ another turn.
 If Orca definitively refuses a send before delivery, the bridge clears it.
 If the saved chat was rejected as missing, a later message opens a fresh
 chat. Otherwise an unconfirmed send or unanswered question stays pending for
-24 hours. The next message after expiry clears it and returns an expiry
+24 hours. After checking the Orca bot chat, send `/reset` or `重置` to clear
+the pending record early. That message is not forwarded and the request is
+not resent. The next message after expiry clears it and returns an expiry
 notice. The bridge sends no question on that turn. Check the Orca bot chat
 before repeating the earlier request, which may still be running there.
 
