@@ -36,6 +36,13 @@ The Orca command path was exercised with Orca CLI 1.4.268.
    `--unified-app-id`. Keep the AppSecret in DingTalk/dws credential storage.
    Passing a secret as a CLI flag exposes it in the local process list.
 
+To get the only permitted staff ID, run this while dws is logged into the same
+organization:
+
+```sh
+dws contact user get-self --jq '.result[0].orgEmployeeModel.userId'
+```
+
 ## Run
 
 In Orca, open the checkout and create a **new plain-shell terminal tab** for
@@ -145,6 +152,7 @@ a temporary state directory, and invoke the handler as dws would:
 (
   export DINGTALK_OWNER_USER_ID=synthetic DWS_ALLOWED_USERS=synthetic
   export DWS_ALLOWED_GROUPS=none
+  export ORCA_BRIDGE_BOT='Sto'  # Set this to your bot name if it differs.
   export ORCA_BRIDGE_SCOPE="$(printf '%064d' 1)"
   export ORCA_BRIDGE_STATE_DIR="$(mktemp -d)"
   python3 -I bridge.py handle '--probe: reply with BRIDGE_OK using the question reply command.' </dev/null

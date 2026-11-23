@@ -301,3 +301,18 @@ class ReadmeTests(unittest.TestCase):
         for text in errors + settings:
             with self.subTest(text=text):
                 self.assertTrue(text in readme, f"README.zh-CN.md does not mention: {text}")
+
+    def test_chinese_troubleshooting_errors_exist_in_bridge(self):
+        source = BRIDGE.read_text(encoding="utf-8")
+        readme = BRIDGE.with_name("README.zh-CN.md").read_text(encoding="utf-8")
+        troubleshooting = readme.split("## 排错", 1)[1].split("### 没有报错", 1)[0]
+        errors = re.findall(r"^\| `([^`]+)` \|", troubleshooting, re.MULTILINE)
+        bridge_errors = [node.args[0].value for node in ast.walk(ast.parse(source))
+                         if isinstance(node, ast.Call)
+                         and getattr(node.func, "id", None) in {"BridgeError", "OrcaRejected"}
+                         and isinstance(node.args[0], ast.Constant)]
+        bridge_errors += re.findall(r'"Bridge error: ([^"{]+)"', source)
+        self.assertGreater(len(errors), 10)
+        for text in errors:
+            with self.subTest(text=text):
+                self.assertIn(text, bridge_errors, f"README.zh-CN.md lists removed error: {text}")

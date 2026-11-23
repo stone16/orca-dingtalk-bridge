@@ -184,12 +184,15 @@ Orca 是异步收问题的：桥发出问题后拿到一个请求 ID，然后只
 
 每条消息最多等 `ORCA_BRIDGE_TIMEOUT` 秒（默认 300）。要改这个值，必须在启动前设置，改完后重启桥才会生效。等不到时分三种情况：
 
-**问题已送达，只是还没答完。** 钉钉会收到 still pending 的提示，bot 在 Orca 里继续做。
-这时桥会记下一条 pending 记录：
+**问题已送达，只是还没答完。** 第一次等待超时时，钉钉会收到
+`Orca has not answered yet. Send any message later to collect the reply; that message will not be forwarded. ...`
+提示，bot 在 Orca 里继续做。如果下一条消息到来时 bot 仍在运行，会收到
+`The earlier Orca request is still running, so this message was not forwarded. ...` 提示。
+这两种情况都会记下一条 pending 记录：
 
 - 你发的**下一条消息不会转给 bot**。桥只借这次机会去取上一条的回复。
 - 取到了，会回「**Earlier Orca reply** (this message was not forwarded)」加上那条回复；
-  取不到，就再提示一次 still pending。
+  取不到，就再提示一次仍在运行的 pending 状态。
 - 取回之后，再发的新消息才开始新的一轮。所以长任务做完后，先随便发一条（比如「取回」）拿结果，
   再重发你真正想问的。
 
@@ -209,14 +212,15 @@ pending 记录 24 小时后过期。过期后的第一条消息只会清掉记�
 orca bot chats --bot '你的 bot 名'
 ```
 
-不想等 24 小时，可以手动清掉记录。先在 Orca 里确认旧请求已经结束，然后：
+确认 Orca 里的旧请求已经结束后，发送 `/reset` 或 `重置` 会立即清掉 unconfirmed pending，保留已有的 Orca chat。
+如果钉钉无法使用，或状态文件损坏，才需要手动清掉记录。先在 Orca 里确认旧请求已经结束，然后：
 
 1. 在桥的终端按 Ctrl-C 停止；
 2. 把状态目录里的 `bridge-state-<64 位十六进制>.json` 挪走（建议改名备份，不要直接删）；
 3. 重新 `start`。下一条消息会开一个新的 Orca chat。
 
 调大 `ORCA_BRIDGE_TIMEOUT` 能少遇到 pending，但每条消息占着桥的时间也会变长，这期间别的消息都会被拒收。
-pending 期间换一个终端标签重启桥，能不能取回旧回复取决于 Orca 是否还能读旧终端的邮箱，这种情况没有验证过。
+pending 期间换一个终端标签重启桥，Orca 1.4.268 仍能读取已关闭旧终端的邮箱并取回迟到回复。
 
 ## 排错
 
@@ -251,9 +255,7 @@ pending 期间换一个终端标签重启桥，能不能取回旧回复取决于
 | `The earlier Orca request is still running, so this message was not forwarded. Send any message later to collect the reply; that message will not be forwarded. The request will not be resent and expires after 24 hours. Send /reset or 重置 after checking Orca to clear it.` | 上一条问题仍在运行 | 稍后发消息取回，或确认 Orca 后发 `/reset` 清除 |
 | `Orca has not answered yet. Send any message later to collect the reply; that message will not be forwarded. The request will not be resent and expires after 24 hours. Send /reset or 重置 after checking Orca to clear it.` | 等待超时，问题已送达 | 稍后再发一条来取回，或确认 Orca 后发 `/reset` 清除，见[超时与 pending](#超时与-pending) |
 | `Orca returned an unconfirmed result. Check the Orca bot chat before retrying.` | Orca 的结果无法确认 | 先到 Orca 的 bot chat 里看那条问题有没有收到，再决定要不要重发 |
-| `The previous send is unconfirmed. Its pending record expires after 24 hours. Check the Orca bot chat before repeating the request.` | 上一次发送结果不确定，桥拒绝重发 | 去 Orca 确认；需要提前解除就按上文手动清掉记录 |
 | `The previous request expired and was not resent. Check Orca before continuing.` | pending 超过 24 小时，已清除，这条消息没有转发 | 去 Orca 确认旧请求的结果，然后重发 |
-| `Pending request cleared. This message was not forwarded.` | 收到 `/reset` 或 `重置` | 旧 pending 已清除，下一条消息会开始新请求 |
 | `Orca or local state failed. Check the bot chat before retrying.` | 其他意外：`orca` 不在 PATH、CLI 输出无法解析、状态文件损坏等 | 先查 bot chat；一直出现就按上文挪走状态文件 |
 
 ### 没有报错，但不对劲
@@ -263,6 +265,7 @@ pending 期间换一个终端标签重启桥，能不能取回旧回复取决于
 - **群里 @ 机器人没反应**：设计如此，只支持单聊。
 - **回复是纯文本，不是卡片**：设计如此，200 个字符以内是纯文本，更长的按 Markdown 渲染。
 - **回复是 `The Orca bot returned an empty answer.`**：bot 给了空回复，去 Orca 的 chat 里看它做了什么。
+- **发送 `/reset` 或 `重置` 后收到 `Pending request cleared. This message was not forwarded.`**：pending 已清除，已有的 Orca chat 会保留，下一条消息会开始新请求。
 - **换了 bot 或应用后，bot 不记得之前的对话**：状态按应用、bot 和主人区分，换了就会开新 chat。
 
 ## 安全边界
