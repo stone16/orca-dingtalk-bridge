@@ -13,8 +13,8 @@ Rules for the whole run:
   `--client-secret`.
 - Do not write the staff ID, the unified app ID, or any secret into files in
   the checkout.
-- Use only the commands in this guide and in the READMEs. If a command fails,
-  find its `Bridge error:` text in the troubleshooting table
+- Use only the commands in this guide and in the READMEs. If a command prints
+  a `Bridge error:` line, find that text in the troubleshooting table
   ([README.zh-CN.md#排错](README.zh-CN.md#排错); the error strings there are
   the exact English text) before trying anything else. Step numbers in that
   table refer to the Chinese README, not to this guide.
@@ -38,8 +38,10 @@ if yours differ.
 If `dws version` suggests an upgrade, mention it to the human but do not run
 `dws upgrade` yourself.
 
-**Done when:** `sw_vers` prints `macOS`, the other commands print a version or
-a list, and `orca bot list` shows at least one bot.
+**Done when:** `sw_vers` prints `macOS`, Python is 3.10 or later, the other
+commands print a version or a list, and `orca bot list` shows at least one bot.
+If Python is older than 3.10, STOP and ask the human to install a newer
+`python3`.
 
 **STOP:** show the human the bot names from `orca bot list` and ask: "Which
 Orca bot should answer your DingTalk messages?" Remember the answer as the bot
@@ -135,6 +137,9 @@ If the tab is an agent pane after all, step 8 fails with
 `Start the bridge in a live, plain-shell Orca terminal.`
 
 ## 7. Self-check the Orca half
+
+In steps 7 and 8, every `<...>` placeholder is inside single quotes. If a value
+contains a single quote, write it as `'\''` so the command stays valid.
 
 Fill in the bot name and the checkout path, then give the human this block to
 paste into the new tab. It sends one real question to the bot, with synthetic

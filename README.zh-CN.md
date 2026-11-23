@@ -5,7 +5,7 @@
 在手机钉钉里私聊你自己的 Orca bot。桥接程序跑在开着 Orca 的那台电脑上，
 通过钉钉 Stream 模式收消息：不需要公网地址，也不用改 Orca。
 
-![钉钉私聊 ↔ 本机 Orca：钉钉私聊、DingTalk Stream、本机桥接、Orca 里的 bot、回复回到同一个私聊](docs/images/bridge-flow.zh-CN.png)
+![钉钉私聊 ↔ 本机 Orca：钉钉私聊、DingTalk Stream、本机桥接、Orca 里的 bot、回复回到同一个私聊；已要求 bot 不把私事回到钉钉](docs/images/bridge-flow.zh-CN.png)
 
 ## 让 agent 帮你装
 
