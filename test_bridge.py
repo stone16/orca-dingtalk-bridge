@@ -79,7 +79,6 @@ class ConfigTests(unittest.TestCase):
             self.assertNotIn("--allowed-users", command)
             self.assertNotIn("--daemon", command)
             self.assertIn("--reply-card=false", command)
-            self.assertEqual(command[command.index("--agent-timeout") + 1], "135")
             self.assertTrue(command[-1].endswith("bridge.py handle"))
             self.assertEqual(command[command.index("--agent-timeout") + 1], "315")
 
@@ -222,6 +221,20 @@ class BridgeTests(unittest.TestCase):
                     self.bridge.ask("new")
                 cli.assert_not_called()
                 self.assertEqual(json.loads(self.path.read_text()), {"chat": "abc"})
+
+    def test_reset_clears_pending_without_forwarding(self):
+        self.path.write_text(json.dumps({"chat": "abc", "pending": {"id": "q1"}}))
+        with patch("bridge.orca") as cli:
+            self.assertEqual(self.bridge.ask("  重置  "), "Pending request cleared. This message was not forwarded.")
+        cli.assert_not_called()
+        self.assertEqual(json.loads(self.path.read_text()), {"chat": "abc"})
+
+    def test_reset_command_is_also_accepted_in_english(self):
+        self.path.write_text(json.dumps({"pending": {"id": "q1"}}))
+        with patch("bridge.orca") as cli:
+            self.assertEqual(self.bridge.ask("/reset"), "Pending request cleared. This message was not forwarded.")
+        cli.assert_not_called()
+        self.assertEqual(json.loads(self.path.read_text()), {})
 
     def test_orca_distinguishes_declined_send_from_transport_failure(self):
         for code, result_type in (("bot_chat_not_found", OrcaRejected), ("runtime_unavailable", BridgeError)):

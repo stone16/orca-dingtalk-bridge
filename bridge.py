@@ -155,6 +155,10 @@ class Bridge:
                 entry = json.loads(self.state_file.read_text(encoding="utf-8"))
             except FileNotFoundError:
                 entry = {}
+            if text.strip() in {"/reset", "重置"}:
+                entry.pop("pending", None)
+                self.save(entry)
+                return "Pending request cleared. This message was not forwarded."
             chat = entry.get("chat")
             pending = entry.get("pending")
             # State from earlier versions has no timestamp. Its last write recorded the intent or receipt.
@@ -200,11 +204,17 @@ class Bridge:
             try:
                 answer, chat = self.answer(pending, chat, deadline)
             except (TimeoutError, subprocess.TimeoutExpired):
+                if recovering:
+                    raise BridgeError(
+                        "The earlier Orca request is still running, so this message was not forwarded. "
+                        "Send any message later to collect the reply; that message will not be forwarded. "
+                        "The request will not be resent and expires after 24 hours. Send /reset or 重置 "
+                        "after checking Orca to clear it."
+                    ) from None
                 raise BridgeError(
-                    ("The earlier Orca request is still running, so this message was not forwarded. "
-                     if recovering else "Orca has not answered yet. ")
-                    + "Send any message later to collect the reply; that message will not be forwarded. "
-                    "The request will not be resent and expires after 24 hours."
+                    "Orca has not answered yet. Send any message later to collect the reply; that message "
+                    "will not be forwarded. The request will not be resent and expires after 24 hours. "
+                    "Send /reset or 重置 after checking Orca to clear it."
                 ) from None
             self.save({"chat": chat})
             reply = format_reply(answer)

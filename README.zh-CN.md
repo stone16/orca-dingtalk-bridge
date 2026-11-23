@@ -144,7 +144,7 @@ python3 bridge.py start '你的 unifiedAppId'
 | `DINGTALK_OWNER_USER_ID` | 是 | — | 唯一允许使用的 staff ID，只能有一个，不能带逗号 |
 | `DWS_ALLOWED_USERS` | 是 | — | dws 的用户白名单，必须和 `DINGTALK_OWNER_USER_ID` 完全一致 |
 | `ORCA_BRIDGE_BOT` | 实际必填 | `Sto` | 要对话的 Orca bot 名，用 `orca bot list` 查 |
-| `ORCA_BRIDGE_TIMEOUT` | 否 | `120` | 每条消息最多等多少秒，必须是正整数。dws 侧的 agent 超时会设成这个值加 15 秒 |
+| `ORCA_BRIDGE_TIMEOUT` | 否 | `300` | 每条消息最多等多少秒，必须是正整数。dws 侧的 agent 超时会设成这个值加 15 秒 |
 | `ORCA_BRIDGE_STATE_DIR` | 否 | `~/.orca-dingtalk-bridge` | 状态目录，放一个只有你能读的位置 |
 | `DWS_ALLOWED_GROUPS` | 不要设 | — | 只能不设或设为 `none`。启动器总会把它设成 `none` |
 | `DINGTALK_ALLOWED_USERS` | 不要设 | — | 旧版本的变量，设了会拒绝启动 |
@@ -182,7 +182,7 @@ python3 bridge.py start '你的 unifiedAppId'
 Orca 是异步收问题的：桥发出问题后拿到一个请求 ID，然后只在启动桥的那个终端的邮箱里，按请求 ID 找回复。
 同一时间只处理一条消息，处理期间再来的消息会被拒收，不会转给 bot。
 
-每条消息最多等 `ORCA_BRIDGE_TIMEOUT` 秒（默认 120）。等不到时分三种情况：
+每条消息最多等 `ORCA_BRIDGE_TIMEOUT` 秒（默认 300）。要改这个值，必须在启动前设置，改完后重启桥才会生效。等不到时分三种情况：
 
 **问题已送达，只是还没答完。** 钉钉会收到 still pending 的提示，bot 在 Orca 里继续做。
 这时桥会记下一条 pending 记录：
@@ -192,6 +192,9 @@ Orca 是异步收问题的：桥发出问题后拿到一个请求 ID，然后只
   取不到，就再提示一次 still pending。
 - 取回之后，再发的新消息才开始新的一轮。所以长任务做完后，先随便发一条（比如「取回」）拿结果，
   再重发你真正想问的。
+
+确认 Orca 里的旧请求已经结束后，可以在钉钉发送一条单独的 `/reset` 或 `重置`，立即清掉 pending。
+这条消息只会收到确认，不会转给 bot。只有白名单里的发送者能触发这个命令。
 
 **发送结果不确定。** 比如 Orca CLI 超时，或者返回了无法确认的结果。桥不知道 bot 有没有收到，
 为了不让同一件事执行两遍，它不会重发。之后每条消息都会收到 unconfirmed 的提示，直到记录过期。
@@ -244,10 +247,13 @@ pending 期间换一个终端标签重启桥，能不能取回旧回复取决于
 | `Orca refused the request before delivery. Check the bot and terminal settings.` | bot 名不对，或者启动桥的终端已失效。问题没有发出去 | 用 `orca bot list` 核对 `ORCA_BRIDGE_BOT`，必要时重新启动 |
 | `The saved Orca chat is unavailable. The next message will start a new chat.` | 保存的 Orca chat 被删了 | 直接再发一次 |
 | `The bridge is busy with another message. This message was not forwarded.` | 上一条还在处理 | 等它回复后再发 |
-| `The Orca request is still pending. A later message can collect the earlier reply. The pending record expires after 24 hours. The bridge will not resend the request.` | 等待超时，问题已送达 | 稍后再发一条来取回，见[超时与 pending](#超时与-pending) |
+| `The previous send is unconfirmed, so this message was not forwarded. Its pending record expires after 24 hours. Check the Orca bot chat before repeating the request.` | 上一次发送结果不确定 | 先去 Orca 确认，记录过期前不会重发 |
+| `The earlier Orca request is still running, so this message was not forwarded. Send any message later to collect the reply; that message will not be forwarded. The request will not be resent and expires after 24 hours. Send /reset or 重置 after checking Orca to clear it.` | 上一条问题仍在运行 | 稍后发消息取回，或确认 Orca 后发 `/reset` 清除 |
+| `Orca has not answered yet. Send any message later to collect the reply; that message will not be forwarded. The request will not be resent and expires after 24 hours. Send /reset or 重置 after checking Orca to clear it.` | 等待超时，问题已送达 | 稍后再发一条来取回，或确认 Orca 后发 `/reset` 清除，见[超时与 pending](#超时与-pending) |
 | `Orca returned an unconfirmed result. Check the Orca bot chat before retrying.` | Orca 的结果无法确认 | 先到 Orca 的 bot chat 里看那条问题有没有收到，再决定要不要重发 |
 | `The previous send is unconfirmed. Its pending record expires after 24 hours. Check the Orca bot chat before repeating the request.` | 上一次发送结果不确定，桥拒绝重发 | 去 Orca 确认；需要提前解除就按上文手动清掉记录 |
 | `The previous request expired and was not resent. Check Orca before continuing.` | pending 超过 24 小时，已清除，这条消息没有转发 | 去 Orca 确认旧请求的结果，然后重发 |
+| `Pending request cleared. This message was not forwarded.` | 收到 `/reset` 或 `重置` | 旧 pending 已清除，下一条消息会开始新请求 |
 | `Orca or local state failed. Check the bot chat before retrying.` | 其他意外：`orca` 不在 PATH、CLI 输出无法解析、状态文件损坏等 | 先查 bot chat；一直出现就按上文挪走状态文件 |
 
 ### 没有报错，但不对劲

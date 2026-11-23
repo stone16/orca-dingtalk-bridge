@@ -106,10 +106,14 @@ passes that budget plus 15 seconds to dws as its per-call limit, so restart
 the bridge to change it. A restart keeps the pending request, and Orca
 1.4.268 still serves the earlier terminal's mailbox after that tab closes.
 
-A timeout preserves the pending request and returns an error to DingTalk.
+A timeout preserves the pending request and returns an error to DingTalk. The
+timeout notice points to `/reset` and `重置` for clearing it after checking Orca.
 Send any message later to collect the reply. The bridge returns the earlier
 reply, labelled as such, and does not forward the message that collected it.
 If the bot is still working, the error says that message was not forwarded.
+To clear a pending request from DingTalk after checking Orca, send exactly
+`/reset` or `重置`. The allowlisted sender receives a confirmation, and the
+reset message is not forwarded.
 Once the previous reply has been recovered, a subsequent new message starts
 another turn.
 
@@ -138,11 +142,13 @@ the Orca half, use a dedicated Orca shell with synthetic allowlist values and
 a temporary state directory, and invoke the handler as dws would:
 
 ```sh
-export DINGTALK_OWNER_USER_ID=synthetic DWS_ALLOWED_USERS=synthetic
-export DWS_ALLOWED_GROUPS=none
-export ORCA_BRIDGE_SCOPE="$(printf '%064d' 1)"
-export ORCA_BRIDGE_STATE_DIR="$(mktemp -d)"
-python3 -I bridge.py handle '--probe: reply with BRIDGE_OK using the question reply command.' </dev/null
+(
+  export DINGTALK_OWNER_USER_ID=synthetic DWS_ALLOWED_USERS=synthetic
+  export DWS_ALLOWED_GROUPS=none
+  export ORCA_BRIDGE_SCOPE="$(printf '%064d' 1)"
+  export ORCA_BRIDGE_STATE_DIR="$(mktemp -d)"
+  python3 -I bridge.py handle '--probe: reply with BRIDGE_OK using the question reply command.' </dev/null
+)
 ```
 
 This sends a real question to the configured Orca bot from that shell.
