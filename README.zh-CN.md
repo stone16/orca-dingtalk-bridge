@@ -7,6 +7,29 @@
 
 ![钉钉私聊 ↔ 本机 Orca：钉钉私聊、DingTalk Stream、本机桥接、Orca 里的 bot、回复回到同一个私聊](docs/images/bridge-flow.zh-CN.png)
 
+## 让 agent 帮你装
+
+把下面这段话复制给在这台 Mac 的 Orca 里运行的编程 agent（Claude Code、Codex 等）：
+
+```text
+按照 https://github.com/stone16/orca-dingtalk-bridge/blob/main/INSTALL.md 在这台 Mac 上安装 orca-dingtalk-bridge。每到 STOP 步骤就停下来问我。不要向我索要，也不要打印钉钉应用的 AppSecret。
+```
+
+有四件事仍需你亲自做：在开发者后台创建并发布钉钉应用、登录 dws、确认你的 staff ID、
+打开 Orca 终端并发出第一条钉钉私聊。
+
+> [!IMPORTANT]
+> 只支持**一个人**和机器人的**单聊**。群聊和多人共用在协议层面就不安全，
+> 不是改配置能解决的，见[白名单与私聊限制](#白名单与私聊限制)。
+> 已用 dws v1.0.68 和 Orca CLI 1.4.268 在真实单聊里跑通，其他版本可能有差异。
+
+**适合你，如果**：你在 macOS 或 Linux 上用 Orca 桌面端，并且已经有 bot；能自己建钉钉企业内部应用，
+或者有管理员帮你建；那台电脑能一直开着 Orca。
+
+**不适合**：群聊、多人共用一个机器人、Windows、需要在服务器上 7×24 常驻。
+
+[快速开始](#快速开始) · [配置](#配置) · [超时与 pending](#超时与-pending) · [排错](#排错) · [安全边界](#安全边界)
+
 ## 工作原理
 
 ```text
