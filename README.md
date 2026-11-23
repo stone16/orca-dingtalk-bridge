@@ -114,20 +114,21 @@ the bridge to change it. A restart keeps the pending request, and Orca
 1.4.268 still serves the earlier terminal's mailbox after that tab closes.
 
 A timeout preserves the pending request and returns an error to DingTalk. The
-timeout notice points to `/reset` and `重置` for clearing it after checking Orca.
+timeout notice points to `重置` for clearing it after checking Orca.
 Send any message later to collect the reply. The bridge returns the earlier
 reply, labelled as such, and does not forward the message that collected it.
 If the bot is still working, the error says that message was not forwarded.
 To clear a pending request from DingTalk after checking Orca, send exactly
-`/reset` or `重置`. The allowlisted sender receives a confirmation, and the
-reset message is not forwarded.
+`重置`. The allowlisted sender receives a confirmation, and the reset message
+is not forwarded. dws handles `/reset` itself by starting a new session, so it
+does not clear the bridge's pending request. Use `重置` instead.
 Once the previous reply has been recovered, a subsequent new message starts
 another turn.
 
 If Orca definitively refuses a send before delivery, the bridge clears it.
 If the saved chat was rejected as missing, a later message opens a fresh
 chat. Otherwise an unconfirmed send or unanswered question stays pending for
-24 hours. After checking the Orca bot chat, send `/reset` or `重置` to clear
+24 hours. After checking the Orca bot chat, send `重置` to clear
 the pending record early. That message is not forwarded and the request is
 not resent. The next message after expiry clears it and returns an expiry
 notice. The bridge sends no question on that turn. Check the Orca bot chat

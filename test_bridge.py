@@ -239,12 +239,12 @@ class BridgeTests(unittest.TestCase):
         cli.assert_not_called()
         self.assertEqual(json.loads(self.path.read_text()), {"chat": "abc"})
 
-    def test_reset_command_is_also_accepted_in_english(self):
-        self.path.write_text(json.dumps({"pending": {"id": "q1"}}))
-        with patch("bridge.orca") as cli:
-            self.assertEqual(self.bridge.ask("/reset"), "Pending request cleared. This message was not forwarded.")
-        cli.assert_not_called()
-        self.assertEqual(json.loads(self.path.read_text()), {})
+    def test_slash_reset_is_forwarded(self):
+        with patch.object(self.bridge, "inbox", return_value=[]), patch.object(
+            self.bridge, "answer", return_value=("ok", "chat")
+        ), patch("bridge.orca", return_value={"messageId": "q1"}) as cli:
+            self.assertEqual(self.bridge.ask("/reset"), "ok")
+        cli.assert_called_once()
 
     def test_orca_distinguishes_declined_send_from_transport_failure(self):
         for code, result_type in (("bot_chat_not_found", OrcaRejected), ("runtime_unavailable", BridgeError)):
