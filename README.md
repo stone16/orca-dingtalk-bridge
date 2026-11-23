@@ -9,6 +9,19 @@ the Mac running the bridge. The bridge needs no Orca changes or public endpoint.
 
 ![DingTalk DM to Orca on your Mac: DingTalk DM, DingTalk Stream, local bridge, Orca bot, reply in the same DM](docs/images/bridge-flow.en.png)
 
+## Set it up with your agent
+
+Copy this prompt into your coding agent (Claude Code, Codex, or similar)
+running in Orca on the Mac:
+
+```text
+Set up orca-dingtalk-bridge on this Mac by following https://github.com/stone16/orca-dingtalk-bridge/blob/main/INSTALL.md. Stop and ask me at each STOP step. Never ask me for or print the DingTalk app secret.
+```
+
+You still do four things yourself: create and publish the DingTalk app in the
+developer console, log in to dws, confirm your staff ID, and open the Orca
+terminal and send the first DingTalk message.
+
 ## Prerequisites
 
 - macOS or Linux, Python 3.10+, and a checkout whose absolute path has no whitespace
