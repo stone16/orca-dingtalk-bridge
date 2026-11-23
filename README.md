@@ -7,6 +7,8 @@ owner's 1:1 DingTalk chat to one local Orca bot and relays the bot's replies.
 We use it to talk to our Orca bot from DingTalk on a phone while away from
 the Mac running the bridge. The bridge needs no Orca changes or public endpoint.
 
+![DingTalk DM to Orca on your Mac: DingTalk DM, DingTalk Stream, local bridge, Orca bot, reply in the same DM](docs/images/bridge-flow.en.png)
+
 ## Prerequisites
 
 - macOS or Linux, Python 3.10+, and a checkout whose absolute path has no whitespace

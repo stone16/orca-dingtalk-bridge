@@ -8,6 +8,7 @@
 | `test_bridge.py` | Unit and subprocess regression tests |
 | `README.md` | English user guide and safety contract |
 | `README.zh-CN.md` | Chinese quick start and troubleshooting |
+| `docs/images/` | README flow diagrams (English and Chinese PNG) |
 | `LICENSE` | MIT license |
 | Test command | `python3 -I -B -m unittest discover -s . -v` |
 
